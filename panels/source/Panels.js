@@ -108,9 +108,20 @@ enyo.kind({
 		this.inherited(arguments);
 	},
 	removeControl: function(inControl) {
+		// Skip extra work during panel destruction.
+		if (this.destroying) {
+			return this.inherited(arguments);
+		}
+		// adjust index if the current panel is being removed
+		// so it's either the previous panel or the first one.
+		var newIndex = -1;
+		var controlIndex = enyo.indexOf(inControl, this.controls);
+		if (controlIndex === this.index) {
+			newIndex = Math.max(controlIndex - 1, 0);
+		}
 		this.inherited(arguments);
-		if (this.destroying && this.controls.length > 0 && this.isPanel(inControl)) {
-			this.setIndex(Math.max(this.index - 1, 0));
+		if (newIndex !== -1 && this.controls.length > 0) {
+			this.setIndex(newIndex);
 			this.flow();
 			this.reflow();
 		}
@@ -165,8 +176,11 @@ enyo.kind({
 	*/
 	setIndex: function(inIndex) {
 		// override setIndex so that indexChanged is called
-		// whether this.index has actually changed or not
-		this.setPropertyValue("index", inIndex, "indexChanged");
+		// whether this.index has actually changed or not. Also, do
+		// index clamping here.
+		var prev = this.get("index");
+		this.index = this.clamp(inIndex);
+		this.notifyObservers("index", prev, inIndex);
 	},
 	/**
 		Sets the active panel to the panel specified by the given index.
@@ -181,26 +195,36 @@ enyo.kind({
 		Selects the named component owned by the Panels and returns its index.
 	*/
 	selectPanelByName: function(name) {
-		if (!name) return;
+		if (!name) {
+			return;
+		}
 		var idx = 0;
 		var panels = this.getPanels();
 		var len = panels.length;
 		for (; idx < len; ++idx) {
 			if (name === panels[idx].name) {
-			this.setIndex(idx);
-			return idx;
+				this.setIndex(idx);
+				return idx;
 			}
 		}
 	},
 	//* Transitions to the previous panel--i.e., the panel whose index value is
 	//* one less than that of the current active panel.
 	previous: function() {
-		this.setIndex(this.index-1);
+		var prevIndex = this.index - 1;
+		if (this.wrap && prevIndex < 0) {
+			prevIndex = this.getPanels().length - 1;
+		}
+		this.setIndex(prevIndex);
 	},
 	//* Transitions to the next panel--i.e., the panel whose index value is one
 	//* greater than that of the current active panel.
 	next: function() {
-		this.setIndex(this.index+1);
+		var nextIndex = this.index+1;
+		if (this.wrap && nextIndex >= this.getPanels().length) {
+			nextIndex = 0;
+		}
+		this.setIndex(nextIndex);
 	},
 	//* @protected
 	clamp: function(inValue) {
@@ -215,9 +239,11 @@ enyo.kind({
 	},
 	indexChanged: function(inOld) {
 		this.lastIndex = inOld;
-		this.index = this.clamp(this.index);
 		if (!this.dragging && this.$.animator) {
 			if (this.$.animator.isAnimating()) {
+				if (this.finishTransitionInfo) {
+					this.finishTransitionInfo.animating = true;
+				}
 				this.completed();
 			}
 			this.$.animator.stop();
@@ -244,7 +270,7 @@ enyo.kind({
 		this.fraction = 1;
 		this.stepTransition();
 		this.finishTransition();
-        return true;
+		return true;
 	},
 	dragstart: function(inSender, inEvent) {
 		if (this.draggable && this.layout && this.layout.canDragEvent(inEvent)) {
@@ -370,10 +396,13 @@ enyo.kind({
 	fireTransitionFinish: function() {
 		var t = this.finishTransitionInfo;
 		if (this.hasNode() && (!t || (t.fromIndex != this.lastIndex || t.toIndex != this.index))) {
-			this.finishTransitionInfo = {fromIndex: this.lastIndex, toIndex: this.index};
+			if (t && t.animating) {
+				this.finishTransitionInfo = {fromIndex: t.toIndex, toIndex: this.lastIndex};
+			} else {
+				this.finishTransitionInfo = {fromIndex: this.lastIndex, toIndex: this.index};
+			}
 			this.doTransitionFinish(enyo.clone(this.finishTransitionInfo));
 		}
-		this.lastIndex=this.index;
 	},
 	// gambit: we interpolate between arrangements as needed.
 	stepTransition: function() {
