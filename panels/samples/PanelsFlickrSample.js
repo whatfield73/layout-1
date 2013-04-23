@@ -32,7 +32,7 @@ enyo.kind({
 				{name: "imageSpinner", kind: "Image", src: "assets/spinner-large.gif", classes: "enyo-fit panels-sample-flickr-center", showing: false}
 			]}
 		]},
-		{kind: "FlickrSearch", onResults: "searchResults"}
+		{name: "flickrSearch", kind: "enyo.sample.PanelsFlickrSearch", onResults: "searchResults"}
 	],
 	rendered: function() {
 		this.inherited(arguments);
@@ -112,7 +112,7 @@ enyo.kind({
 
 // A simple component to do a Flickr search.
 enyo.kind({
-	name: "FlickrSearch",
+	name: "enyo.sample.PanelsFlickrSearch",
 	kind: "Component",
 	published: {
 		searchText: ""
@@ -134,18 +134,17 @@ enyo.kind({
 			page: i,
 			text: this.searchText
 		};
+		var req;
 		if (window.location.protocol === "ms-appx:") {
 			params.nojsoncallback = 1;
 			// Use ajax for platforms with no jsonp support (Windows 8)
-			var req = new enyo.Ajax({url: this.url, handleAs: "text"})
+			req = new enyo.Ajax({url: this.url, handleAs: "text"})
 				.response(this, "processAjaxResponse")
-				.go(params)
-				;
+				.go(params);
 		} else {
-			var req = new enyo.JsonpRequest({url: this.url, callbackName: "jsoncallback"})
+			req = new enyo.JsonpRequest({url: this.url, callbackName: "jsoncallback"})
 				.response(this, "processResponse")
-				.go(params)
-				;
+				.go(params);
 		}
 		return req;
 	},
