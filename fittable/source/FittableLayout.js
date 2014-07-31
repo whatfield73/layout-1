@@ -5,110 +5,211 @@
 	the items having natural size, but one item expanding to fill the remaining
 	space. The item that expands is labeled with the attribute _fit: true_.
 
-	The subkinds <a href="#enyo.FittableColumnsLayout">enyo.FittableColumnsLayout</a>
-	and	<a href="#enyo.FittableRowsLayout">enyo.FittableRowsLayout</a> (or
-	<i>their</i> subkinds) are used for layout rather than _enyo.FittableLayout_
-	because they specify properties that the framework expects to be available
-	when laying	items out.
+	The subkinds [enyo.FittableColumnsLayout](#enyo.FittableColumnsLayout) and
+	[enyo.FittableRowsLayout](#enyo.FittableRowsLayout) (or _their_ subkinds)
+	are used for layout rather than _enyo.FittableLayout_ because they specify
+	properties that the framework expects to be available when laying items out.
 
-	For more information,see the documentation on
-	[Fittables](https://github.com/enyojs/enyo/wiki/Fittables) in the Enyo
-	Developer Guide.
+	When available on the platform, you can opt-in to have _enyo.FittableLayout_ use CSS
+	flexible box (flexbox) to implement fitting behavior on the platform for better 
+	performance, and will fall back to JS-based layout on older platforms.
+	There are three subtle differences between the flexbox and JS implementations
+	that should be noted:
+
+	* When using flexbox, vertical margins (`margin-top`, `margin-bottom`) will
+		not collapse; when using JS layout, vertical margin will collapse according
+		to static layout rules.
+	* When using flexbox, non-fitting children of the Fittable must not be sized
+		using percentages of the container (even if set to `position: relative`);
+		this is explicitly not supported by the flexbox 2013 spec.
+	* The flexbox-based Fittable implementation will respect multiple children
+		with `fit: true` (the fitting space will be divided equally between them).
+		This is NOT supported by the JS implementation, and should not be relied
+		on if deploying to platforms without flexbox support.
+
+	The flexbox implementation was added to Enyo 2.5.0 as a performance optimization;
+	to opt-in to this optimization set `useFlex: true` on the
+	Fittable container, which will result in the use of flexbox when possible - noting the
+	subtle differences between the JS fittables implementation and flexbox.
+
+	For more information, see the documentation on
+	[Fittables](building-apps/layout/fittables.html) in the Enyo Developer Guide.
 */
+
 enyo.kind({
-	name: "enyo.FittableLayout",
-	kind: "Layout",
+	name: 'enyo.FittableLayout',
+	kind: 'Layout',
+	noDefer: true,
+
 	//* @protected
-	calcFitIndex: function() {
-		for (var i=0, c$=this.container.children, c; (c=c$[i]); i++) {
-			if (c.fit && c.showing) {
-				return i;
-			}
-		}
-	},
-	getFitControl: function() {
-		var c$=this.container.children;
-		var f = c$[this.fitIndex];
-		if (!(f && f.fit && f.showing)) {
-			this.fitIndex = this.calcFitIndex();
-			f = c$[this.fitIndex];
-		}
-		return f;
-	},
-	getLastControl: function() {
-		var c$=this.container.children;
-		var i = c$.length-1;
-		var c = c$[i];
-		while ((c=c$[i]) && !c.showing) {
-			i--;
-		}
-		return c;
-	},
-	_reflow: function(measure, cMeasure, mAttr, nAttr) {
-		this.container.addRemoveClass("enyo-stretch", !this.container.noStretch);
-		var f = this.getFitControl();
-		// no sizing if nothing is fit.
-		if (!f) {
-			return;
-		}
-		//
-		// determine container size, available space
-		var s=0, a=0, b=0, p;
-		var n = this.container.hasNode();
-		// calculate available space
-		if (n) {
-			// measure 1
-			p = enyo.dom.calcPaddingExtents(n);
-			// measure 2
-			s = n[cMeasure] - (p[mAttr] + p[nAttr]);
-			//enyo.log("overall size", s);
-		}
-		//
-		// calculate space above fitting control
-		// measure 3
-		var fb = f.getBounds();
-		// offset - container padding.
-		a = fb[mAttr] - ((p && p[mAttr]) || 0);
-		//enyo.log("above", a);
-		//
-		// calculate space below fitting control
-		var l = this.getLastControl();
-		if (l) {
-			// measure 4
-			var mb = enyo.dom.getComputedBoxValue(l.hasNode(), "margin", nAttr) || 0;
-			if (l != f) {
-				// measure 5
-				var lb = l.getBounds();
-				// fit offset + size
-				var bf = fb[mAttr] + fb[measure];
-				// last offset + size + ending margin
-				var bl = lb[mAttr] + lb[measure] + mb;
-				// space below is bottom of last item - bottom of fit item.
-				b = bl - bf;
+	constructor: enyo.inherit(function (sup) {
+		return function () {
+			sup.apply(this, arguments);
+			
+			// Add the force-ltr class if we're in RTL mode, but this control is set explicitly to NOT be in RTL mode.
+			this.container.addRemoveClass("force-left-to-right", (enyo.Control.prototype.rtl && !this.container.get("rtl")) );
+
+			// Flexbox optimization is determined by global flexAvailable and per-instance opt-in useFlex flag
+			this.useFlex = enyo.FittableLayout.flexAvailable && (this.container.useFlex === true);
+			if (this.useFlex) {
+				this.container.addClass(this.flexLayoutClass);
 			} else {
-				b = mb;
+				this.container.addClass(this.fitLayoutClass);
+			}
+		};
+	}),
+	calcFitIndex: function() {
+		var aChildren = this.container.children,
+			oChild,
+			n;
+
+		for (n=0; n<aChildren.length; n++) {
+			oChild = aChildren[n];
+			if (oChild.fit && oChild.showing) {
+				return n;
 			}
 		}
-		this.applyFitSize(measure, s, a, b);
 	},
-	applyFitSize: function(measure, total, before, after) {
-		// calculate appropriate size for fit control
-		var fs = total - (before + after);
-		var f = this.getFitControl();
-		// note: must be border-box;
-		f.applyStyle(measure, fs + "px");
+
+	getFitControl: function() {
+		var aChildren = this.container.children,
+			oFitChild = aChildren[this.fitIndex];
+
+		if (!(oFitChild && oFitChild.fit && oFitChild.showing)) {
+			this.fitIndex = this.calcFitIndex();
+			oFitChild = aChildren[this.fitIndex];
+		}
+		return oFitChild;
 	},
+
+	shouldReverse: function() {
+		return this.container.rtl && this.orient === "h";
+	},
+
+	getFirstChild: function() {
+		var aChildren = this.getShowingChildren();
+
+		if (this.shouldReverse()) {
+			return aChildren[aChildren.length - 1];
+		} else {
+			return aChildren[0];
+		}
+	},
+
+	getLastChild: function() {
+		var aChildren = this.getShowingChildren();
+
+		if (this.shouldReverse()) {
+			return aChildren[0];
+		} else {
+			return aChildren[aChildren.length - 1];
+		}
+	},
+
+	getShowingChildren: function() {
+		var a = [],
+			n = 0,
+			aChildren = this.container.children,
+			nLength   = aChildren.length;
+
+		for (;n<nLength; n++) {
+			if (aChildren[n].showing) {
+				a.push(aChildren[n]);
+			}
+		}
+
+		return a;
+	},
+
+	_reflow: function(sMeasureName, sClienMeasure, sAttrBefore, sAttrAfter) {
+		this.container.addRemoveClass('enyo-stretch', !this.container.noStretch);
+
+		var oFitChild       = this.getFitControl(),
+			oContainerNode  = this.container.hasNode(),  // Container node
+			nTotalSize     = 0,                          // Total container width or height without padding
+			nBeforeOffset   = 0,                         // Offset before fit child
+			nAfterOffset    = 0,                         // Offset after fit child
+			oPadding,                                    // Object containing t,b,r,l paddings
+			oBounds,                                     // Bounds object of fit control
+			oLastChild,
+			oFirstChild,
+			nFitSize;
+
+		if (!oFitChild || !oContainerNode) { return; }
+
+		oPadding   = enyo.dom.calcPaddingExtents(oContainerNode);
+		oBounds    = oFitChild.getBounds();
+		nTotalSize = oContainerNode[sClienMeasure] - (oPadding[sAttrBefore] + oPadding[sAttrAfter]);
+
+		if (this.shouldReverse()) {
+			oFirstChild  = this.getFirstChild();
+			nAfterOffset = nTotalSize - (oBounds[sAttrBefore] + oBounds[sMeasureName]);
+
+			var nMarginBeforeFirstChild = enyo.dom.getComputedBoxValue(oFirstChild.hasNode(), 'margin', sAttrBefore) || 0;
+
+			if (oFirstChild == oFitChild) {
+				nBeforeOffset = nMarginBeforeFirstChild;
+			} else {
+				var oFirstChildBounds      = oFirstChild.getBounds(),
+					nSpaceBeforeFirstChild = oFirstChildBounds[sAttrBefore];
+
+				nBeforeOffset = oBounds[sAttrBefore] + nMarginBeforeFirstChild - nSpaceBeforeFirstChild;
+			}
+		} else {
+			oLastChild    = this.getLastChild();
+			nBeforeOffset = oBounds[sAttrBefore] - (oPadding[sAttrBefore] || 0);
+
+			var nMarginAfterLastChild = enyo.dom.getComputedBoxValue(oLastChild.hasNode(), 'margin', sAttrAfter) || 0;
+
+			if (oLastChild == oFitChild) {
+				nAfterOffset = nMarginAfterLastChild;
+			} else {
+				var oLastChildBounds = oLastChild.getBounds(),
+					nFitChildEnd     = oBounds[sAttrBefore] + oBounds[sMeasureName],
+					nLastChildEnd    = oLastChildBounds[sAttrBefore] + oLastChildBounds[sMeasureName] +  nMarginAfterLastChild;
+
+				nAfterOffset = nLastChildEnd - nFitChildEnd;
+			}
+		}
+
+		nFitSize = nTotalSize - (nBeforeOffset + nAfterOffset);
+		oFitChild.applyStyle(sMeasureName, nFitSize + 'px');
+	},
+
 	//* @public
 	/**
-		Updates the layout to reflect any changes to contained components or the
-		layout container.
+		Assigns any static layout properties not dependent on changes to the
+		rendered component or contaner sizes, etc.
+	*/
+	flow: function() {
+		if (this.useFlex) {
+			var i,
+				children = this.container.children,
+				child;
+			this.container.addClass(this.flexLayoutClass);
+			this.container.addRemoveClass("nostretch", this.container.noStretch);
+			for (i=0; i<children.length; i++) {
+				child = children[i];
+				child.addClass("enyo-flex-item");
+				child.addRemoveClass("flex", child.fit);
+			}
+		}
+	},
+	/**
+		Updates the layout to reflect any changes made to the layout container or
+		the contained components.
 	*/
 	reflow: function() {
-		if (this.orient == "h") {
-			this._reflow("width", "clientWidth", "left", "right");
-		} else {
-			this._reflow("height", "clientHeight", "top", "bottom");
+		if (!this.useFlex) {
+			if (this.orient == 'h') {
+				this._reflow('width', 'clientWidth', 'left', 'right');
+			} else {
+				this._reflow('height', 'clientHeight', 'top', 'bottom');
+			}
 		}
+	},
+	statics: {
+		flexAvailable: false
 	}
 });
 
@@ -124,14 +225,14 @@ enyo.kind({
 	specific base kind.
 
 	For more information, see the documentation on
-	[Fittables](https://github.com/enyojs/enyo/wiki/Fittables) in the Enyo
-	Developer Guide.
+	[Fittables](building-apps/layout/fittables.html) in the Enyo Developer Guide.
 */
 enyo.kind({
-	name: "enyo.FittableColumnsLayout",
-	kind: "FittableLayout",
-	orient: "h",
-	layoutClass: "enyo-fittable-columns-layout"
+	name        : 'enyo.FittableColumnsLayout',
+	kind        : 'FittableLayout',
+	orient      : 'h',
+	fitLayoutClass : 'enyo-fittable-columns-layout',
+	flexLayoutClass: 'enyo-flex-container columns'
 });
 
 
@@ -147,12 +248,22 @@ enyo.kind({
 	specific base kind.
 
 	For more information, see the documentation on
-	[Fittables](https://github.com/enyojs/enyo/wiki/Fittables) in the Enyo
-	Developer Guide.
+	[Fittables](building-apps/layout/fittables.html) in the Enyo Developer Guide.
 */
 enyo.kind({
-	name: "enyo.FittableRowsLayout",
-	kind: "FittableLayout",
-	layoutClass: "enyo-fittable-rows-layout",
-	orient: "v"
+	name        : 'enyo.FittableRowsLayout',
+	kind        : 'FittableLayout',
+	fitLayoutClass : 'enyo-fittable-rows-layout',
+	orient      : 'v',
+	flexLayoutClass: 'enyo-flex-container rows'
 });
+
+// One-time flexbox feature-detection
+(function() {
+	var detector = document.createElement("div");
+	enyo.FittableLayout.flexAvailable = 
+		(detector.style.flexBasis !== undefined) ||
+		(detector.style.webkitFlexBasis !== undefined) ||
+		(detector.style.mozFlexBasis !== undefined) ||
+		(detector.style.msFlexBasis !== undefined);
+})();

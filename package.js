@@ -1,4 +1,5 @@
 enyo.depends(
+	"version.js",
 	"contextual",
 	"fittable",
 	"list",
@@ -6,6 +7,5 @@ enyo.depends(
 	"panels",
 	"tree",
 	"imageview",
-	"flex",
 	"layout.design"
 );

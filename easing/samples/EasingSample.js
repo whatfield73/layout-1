@@ -40,18 +40,20 @@ enyo.kind({
 		this.$.menuButton.setDisabled(false);
 		return true;
 	},
-	create: function() {
-		this.inherited(arguments);
-		this.buildMenu();
-	},
+	create: enyo.inherit(function (sup) {
+		return function() {
+			sup.apply(this, arguments);
+			this.buildMenu();
+		};
+	}),
 	buildMenu: function() {
 		var i = 0;
 		for (var k in enyo.easing){
-		    this.$.menuScroller.createComponent({content: k});
-		    if (i === 0) {
-		    	this.$.menuButton.setContent(k);
-		    }
-		    i++;
+			this.$.menuScroller.createComponent({content: k});
+			if (i === 0) {
+				this.$.menuButton.setContent(k);
+			}
+			i++;
 		}
 	}
 });

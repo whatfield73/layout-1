@@ -1,34 +1,37 @@
 /**
-	_enyo.Arranger_ is an <a href="#enyo.Layout">enyo.Layout</a> that considers
-	one of the controls it lays out as active. The other controls are placed
-	relative to the active control as makes sense for the layout.
+	_enyo.Arranger_ is an [enyo.Layout](#enyo.Layout) that considers one of the
+	controls it lays out as active. The other controls are placed relative to
+	the active control as makes sense for the layout.
 
 	Arranger supports dynamic layouts, meaning it's possible to transition
 	between its layouts	via animation. Typically, arrangers should lay out
 	controls using CSS transforms, since these are optimized for animation. To
 	support this, the controls in an Arranger are absolutely positioned, and
-	the Arranger kind has an `accelerated` property, which marks controls for
-	CSS compositing. The default setting of "auto" ensures that this will occur
-	if enabled by the platform.
+	the Arranger kind has an _accelerated_ property, which marks controls for
+	CSS compositing. The default setting of _"auto"_ ensures that this will
+	occur if enabled by the platform.
 
 	For more information, see the documentation on
-	[Arrangers](https://github.com/enyojs/enyo/wiki/Arrangers)
-	in the Enyo	Developer Guide.
+	[Arrangers](building-apps/layout/arrangers.html) in the Enyo Developer Guide.
 */
 enyo.kind({
 	name: "enyo.Arranger",
 	kind: "Layout",
 	layoutClass: "enyo-arranger",
 	/**
-		Sets controls being laid out to use CSS compositing. A setting of "auto"
-		will mark controls for compositing if the platform supports it.
+		Flag indicating whether the Arranger should lay out controls using CSS
+		compositing. The default setting ("auto") will mark controls for compositing
+		if the platform supports it.
 	*/
 	accelerated: "auto",
-	//* Property of the drag event used to calculate the amount a drag moves the layout
+	/**
+		Property of the drag event, used to calculate the amount that a drag will
+		move the layout
+	*/
 	dragProp: "ddx",
-	//* Property of the drag event used to calculate the direction of a drag
+	//* Property of the drag event, used to calculate the direction of the drag
 	dragDirectionProp: "xDirection",
-	//* Property of the drag event used to calculate whether a drag should occur
+	//* Property of the drag event, used to calculate whether a drag should occur
 	canDragProp: "horizontal",
 	/**
 		If set to true, transitions between non-adjacent arrangements will go
@@ -37,33 +40,34 @@ enyo.kind({
 	*/
 	incrementalPoints: false,
 	/**
-		Called when removing an arranger (for example, when switching a Panels
-		control to a different arrangerKind). Subclasses should implement this
-		function to reset whatever properties they've changed on child controls.
-		You *must* call the superclass implementation in your subclass's
-		_destroy_ function.
+		Called when removing an arranger (e.g., when switching a Panels control to a
+		different _arrangerKind_). Subclasses should implement this function to
+		reset whatever properties they've changed on child controls. Note that you
+		_must_ call the superclass implementation in your subclass's _destroy()_
+		function.
 	*/
-	destroy: function() {
-		var c$ = this.container.getPanels();
-		for (var i=0, c; (c=c$[i]); i++) {
-			c._arranger = null;
-		}
-		this.inherited(arguments);
-	},
+	destroy: enyo.inherit(function(sup) {
+		return function() {
+			var c$ = this.container.getPanels();
+			for (var i=0, c; (c=c$[i]); i++) {
+				c._arranger = null;
+			}
+			sup.apply(this, arguments);
+		};
+	}),
 	/**
 		Arranges the given array of controls (_inC_) in the layout specified by
 		_inName_. When implementing this method, rather than apply styling
-		directly to controls, call _arrangeControl(inControl, inArrangement)_
-		with an _inArrangement_	object with styling settings. These will then be
-		applied via the	_flowControl(inControl, inArrangement)_ method.
+		directly to controls, call _arrangeControl(inControl, inArrangement)_ and
+		pass in an object (_inArrangement_) with styling settings. The styles will
+		then be applied via _flowControl(inControl, inArrangement)_.
 	*/
 	arrange: function(inC, inName) {
 	},
 	/**
-		Sizes the controls in the layout. This method is called only at reflow
-		time. Note that sizing is separated from other layout done in the
-		_arrange_ method because it is expensive and not suitable for dynamic
-		layout.
+		Sizes the controls in the layout. This method is called only at reflow time.
+		Note that the sizing operation has been separated from the layout done in
+		_arrange()_ because it is expensive and not suitable for dynamic layout.
 	*/
 	size: function() {
 	},
@@ -141,7 +145,7 @@ enyo.kind({
 		this.c$ = [].concat(this.container.getPanels());
 		this.controlsIndex = 0;
 		for (var i=0, c$=this.container.getPanels(), c; (c=c$[i]); i++) {
-			enyo.dom.accelerate(c, this.accelerated);
+			enyo.dom.accelerate(c, !c.preventAccelerate && this.accelerated);
 			if (enyo.platform.safari) {
 				// On Safari-desktop, sometimes having the panel's direct child set to accelerate isn't sufficient
 				// this is most often the case with Lists contained inside another control, inside a Panels
@@ -161,17 +165,17 @@ enyo.kind({
 	flowArrangement: function() {
 		var a = this.container.arrangement;
 		if (a) {
-			for (var i=0, c$=this.container.getPanels(), c; (c=c$[i]); i++) {
+			for (var i=0, c$=this.container.getPanels(), c; (c=c$[i]) && (a[i]); i++) {
 				this.flowControl(c, a[i]);
 			}
 		}
 	},
 	//* @public
 	/**
-		Lays out the control (_inControl_) according to the settings stored in
-		the	_inArrangment_ object. By default, _flowControl_ will apply settings
-		of left, top, and opacity. This method should only be implemented to
-		apply other settings made via _arrangeControl_.
+		Lays out the control (_inControl_) according to the settings stored in the
+		_inArrangment_ object. By default, _flowControl()_ will apply settings for
+		left, top, and opacity. This method should only be implemented to apply
+		other settings made via _arrangeControl()_.
 	*/
 	flowControl: function(inControl, inArrangement) {
 		enyo.Arranger.positionControl(inControl, inArrangement);
@@ -204,12 +208,17 @@ enyo.kind({
 			var unit = inUnit || "px";
 			if (!this.updating) {
 				// IE10 uses setBounds because of control hit caching problems seem in some apps
-				if (enyo.dom.canTransform() && !enyo.platform.android && enyo.platform.ie !== 10) {
+				if (enyo.dom.canTransform() && !inControl.preventTransform && !enyo.platform.android && enyo.platform.ie !== 10) {
 					var l = inBounds.left, t = inBounds.top;
 					l = enyo.isString(l) ? l : l && (l + unit);
 					t = enyo.isString(t) ? t : t && (t + unit);
 					enyo.dom.transform(inControl, {translateX: l || null, translateY: t || null});
 				} else {
+					// If a previously positioned control has subsequently been marked with
+					// preventTransform, we need to clear out any old translation values.
+					if (enyo.dom.canTransform() && inControl.preventTransform) {
+						enyo.dom.transform(inControl, {translateX: null, translateY: null});
+					}
 					inControl.setBounds(inBounds, inUnit);
 				}
 			}

@@ -22,10 +22,12 @@ enyo.kind({
 		]},
 		{kind: "enyo.sample.ListHorizontalFlickrSearch", name: "flickrSearch", onResults: "searchResults"}
 	],
-	rendered: function() {
-		this.inherited(arguments);
-		this.search();
-	},
+	rendered: enyo.inherit(function(sup) {
+		return function() {
+			sup.apply(this, arguments);
+			this.search();
+		};
+	}),
 	search: function() {
 		this.searchText = this.$.searchInput.getValue();
 		this.page = 0;
@@ -73,7 +75,7 @@ enyo.kind({
 	events: {
 		onResults: ""
 	},
-	url: "http://api.flickr.com/services/rest/",
+	url: "https://api.flickr.com/services/rest/",
 	pageSize: 200,
 	api_key: "2a21b46e58d207e4888e1ece0cb149a5",
 	search: function(inSearchText, inPage) {

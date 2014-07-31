@@ -4,28 +4,53 @@
  * @author Lex Podgorny <lex.podgorny@lge.com>
  */
 
-if (enyo.platform.ie) {
-	enyo.createMixin({
-		name: 'LayoutInvalidator',
-		invalidateLayout: function() {
-			enyo.FlexLayout.reflowFlexLayouts();
-		},
-		contentChanged: function() {
-			this.inherited(arguments);
-			this.invalidateLayout();
-		},
-		classesChanged: function() {
-			this.inherited(arguments);
-			this.invalidateLayout();
-		}
-		// Causes stack overflow
-		// domStylesChanged: function() {
-		//    this.inherited(arguments);
-		//    this.invalidateLayout();
-		// }
-	});
+enyo.LayoutInvalidator = {
+	name: 'LayoutInvalidator',
 
-	enyo.Control.extend({
-		mixins: ['LayoutInvalidator']
-	});
-}
+	handlers: {
+		onInvalidateLayout: 'onInvalidateLayout'
+	},
+
+	onInvalidateLayout: function() {
+		if (!this.layoutKind) { return false; }
+		if (this.layout.kindName == 'enyo.ContentLayout') {
+			this.layout.reflow();
+		}
+	},
+
+	rendered: enyo.inherit(function (sup) {
+		return function() {
+			sup.apply(this, arguments);
+			this.invalidateLayout();
+		};
+	}),
+
+	invalidateLayout: function() {
+		if (!this.hasNode()) { return; }
+		this.bubble('onInvalidateLayout', {}, this);
+	},
+
+	contentChanged: enyo.inherit(function (sup) {
+		return function() {
+			sup.apply(this, arguments);
+			this.invalidateLayout();
+		};
+	}),
+
+	classesChanged: enyo.inherit(function (sup) {
+		return function() {
+			sup.apply(this, arguments);
+			this.invalidateLayout();
+		};
+	})
+
+	// Causes stack overflow
+	// domStylesChanged: function() {
+	//    sup.apply(this, arguments);
+	//    this.invalidateLayout();
+	// }
+};
+
+enyo.Control.extend({
+	mixins: ['enyo.LayoutInvalidator']
+});

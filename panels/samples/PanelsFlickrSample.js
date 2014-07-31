@@ -34,18 +34,22 @@ enyo.kind({
 		]},
 		{name: "flickrSearch", kind: "enyo.sample.PanelsFlickrSearch", onResults: "searchResults"}
 	],
-	rendered: function() {
-		this.inherited(arguments);
-		this.search();
-	},
-	reflow: function() {
-		this.inherited(arguments);
-		var backShowing = this.$.backToolbar.showing;
-		this.$.backToolbar.setShowing(enyo.Panels.isScreenNarrow());
-		if (this.$.backToolbar.showing != backShowing) {
-			this.$.pictureView.resized();
-		}
-	},
+	rendered: enyo.inherit(function(sup) {
+		return function() {
+			sup.apply(this, arguments);
+			this.search();
+		};
+	}),
+	reflow: enyo.inherit(function(sup) {
+		return function() {
+			sup.apply(this, arguments);
+			var backShowing = this.$.backToolbar.showing;
+			this.$.backToolbar.setShowing(enyo.Panels.isScreenNarrow());
+			if (this.$.backToolbar.showing != backShowing) {
+				this.$.pictureView.resize();
+			}
+		};
+	}),
 	search: function() {
 		this.searchText = this.$.searchInput.getValue();
 		this.page = 0;
@@ -121,7 +125,7 @@ enyo.kind({
 	events: {
 		onResults: ""
 	},
-	url: "http://api.flickr.com/services/rest/",
+	url: "https://api.flickr.com/services/rest/",
 	pageSize: 200,
 	api_key: "2a21b46e58d207e4888e1ece0cb149a5",
 	search: function(inSearchText, inPage) {

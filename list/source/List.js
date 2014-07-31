@@ -4,8 +4,8 @@
 	portion of the list is rendered at a given time. A flyweight pattern is
 	employed, in which controls placed inside the list are created once, but
 	rendered for each list item. For this reason, it's best to use only simple
-	controls in	a List, such as <a href="#enyo.Control">enyo.Control</a> and
-	<a href="#enyo.Image">enyo.Image</a>.
+	controls in	a List, such as [enyo.Control](#enyo.Control) and
+	[enyo.Image](#enyo.Image).
 
 	A List's _components_ block contains the controls to be used for a single
 	row. This set of controls will be rendered for each row. You may customize
@@ -16,11 +16,10 @@
 
 	Beginning with Enyo 2.2, lists have built-in support for swipeable and
 	reorderable list items.  Individual list items are swipeable by default; to
-	enable reorderability, set the _reorderable_ property to true.
+	enable reorderability, set the _reorderable_ property to _true_.
 
 	For more information, see the documentation on
-	[Lists](https://github.com/enyojs/enyo/wiki/Lists)
-	in the Enyo Developer Guide.
+	[Lists](building-apps/layout/lists.html) in the Enyo Developer Guide.
 */
 enyo.kind({
 	name: "enyo.List",
@@ -29,25 +28,25 @@ enyo.kind({
 	published: {
 		/**
 			The number of rows contained in the list. Note that as the amount of
-			list data changes, _setRows_ can be called to adjust the number of
+			list data changes, _setRows()_ may be called to adjust the number of
 			rows. To re-render the list at the current position when the count
-			has changed, call the _refresh_ method.  If the whole data model of
-			the list has changed and you want to redisplay from the top, call
-			the _reset_ method instead.
+			has changed, call the _refresh()_ method.  If the whole data model of
+			the list has changed and you want to redisplay it from the top, call
+			_reset()_ instead.
 		*/
 		count: 0,
 		/**
-			The number of rows to be shown on a given list page segment.
-			There is generally no need to adjust this value.
+			The number of rows to be shown in a given list page segment. There is
+			generally no need to adjust this value.
 		*/
 		rowsPerPage: 50,
 		/**
-			Direction list will be rendered & scrollable--either "v" for vertical
-			or "h" for horizontal
+			Direction in which the list will be rendered and in which it will be
+			scrollable. Valid values are "v" for vertical or "h" for horizontal.
 		*/
 		orient: "v",
 		/**
-			If true, renders the list such that row 0 is at the bottom of the
+			If true, the list is rendered such that row 0 is at the bottom of the
 			viewport and the beginning position of the list is scrolled to the
 			bottom
 		*/
@@ -65,24 +64,33 @@ enyo.kind({
 		fixedSize: false,
 		//* If true, the list will allow the user to reorder list items
 		reorderable: false,
-		//* If true and _reorderable_ is true, reorderable item will be centered on finger
-		//* when created. When false, it will be created over old item and will then track finger.
+		/**
+			If true and _reorderable_ is true, a reorderable item will be centered on
+			finger when created. If false, it will be created over the old item and
+			will then track finger.
+		*/
 		centerReorderContainer: true,
-		//* Array containing components shown as the placeholder when reordering list items.
+		/**
+			Array containing components to be shown as placeholder when reordering
+			list items
+		*/
 		reorderComponents: [],
-		//* Array containing components for the pinned version of a row. If not provided, reordering
-		//* will not support pinned mode.
+		/**
+			Array containing components for the pinned version of a row. If not
+			specified, reordering will not support pinned mode.
+		*/
 		pinnedReorderComponents: [],
 		//* Array containing any swipeable components that will be used
 		swipeableComponents: [],
 		//* If true, swipe functionality is enabled
 		enableSwipe: false,
-		//* If true, tells list to persist the current swipeable item
+		//* If true, list will persist the current swipeable item
 		persistSwipeableItem: false
 	},
 	events: {
 		/**
 			Fires once per row at render time.
+
 			_inEvent.index_ contains the current row index.
 		*/
 		onSetupItem: "",
@@ -179,38 +187,44 @@ enyo.kind({
 	// Percentage of a swipe needed to force completion of the swipe
 	percentageDraggedThreshold: 0.2,
 
-	importProps: function(inProps) {
-		// force touch on desktop when we have reorderable items to work around
-		// problems with native scroller
-		if (inProps && inProps.reorderable) {
-			this.touch = true;
-		}
-		this.inherited(arguments);
-	},
-	create: function() {
-		this.pageSizes = [];
-		this.orientV = this.orient == "v";
-		this.vertical = this.orientV ? "default" : "hidden";
-		this.inherited(arguments);
-		this.$.generator.orient = this.orient;
-		this.getStrategy().translateOptimized = true;
-		this.pageBound = this.orientV ? "top" : "left";
-		this.$.port.addRemoveClass("horizontal",!this.orientV);
-		this.$.page0.addRemoveClass("vertical",this.orientV);
-		this.$.page1.addRemoveClass("vertical",this.orientV);
-		this.bottomUpChanged();
-		this.noSelectChanged();
-		this.multiSelectChanged();
-		this.toggleSelectedChanged();
-		// setup generator to default to "full-list" values
-		this.$.generator.setRowOffset(0);
-		this.$.generator.setCount(this.count);
-	},
-	initComponents: function() {
-		this.createReorderTools();
-		this.inherited(arguments);
-		this.createSwipeableComponents();
-	},
+	importProps: enyo.inherit(function(sup) {
+		return function(inProps) {
+			// force touch on desktop when we have reorderable items to work around
+			// problems with native scroller
+			if (inProps && inProps.reorderable) {
+				this.touch = true;
+			}
+			sup.apply(this, arguments);
+		};
+	}),
+	create: enyo.inherit(function(sup) {
+		return function() {
+			this.pageSizes = [];
+			this.orientV = this.orient == "v";
+			this.vertical = this.orientV ? "default" : "hidden";
+			sup.apply(this, arguments);
+			this.$.generator.orient = this.orient;
+			this.getStrategy().translateOptimized = true;
+			this.$.port.addRemoveClass("horizontal",!this.orientV);
+			this.$.port.addRemoveClass("vertical",this.orientV);
+			this.$.page0.addRemoveClass("vertical",this.orientV);
+			this.$.page1.addRemoveClass("vertical",this.orientV);
+			this.bottomUpChanged();  // Initializes pageBound also
+			this.noSelectChanged();
+			this.multiSelectChanged();
+			this.toggleSelectedChanged();
+			// setup generator to default to "full-list" values
+			this.$.generator.setRowOffset(0);
+			this.$.generator.setCount(this.count);
+		};
+	}),
+	initComponents: enyo.inherit(function(sup) {
+		return function() {
+			this.createReorderTools();
+			sup.apply(this, arguments);
+			this.createSwipeableComponents();
+		};
+	}),
 	createReorderTools: function() {
 		this.createComponent({
 			name: "reorderContainer",
@@ -222,33 +236,48 @@ enyo.kind({
 			onflick: "sendToStrategy"
 		});
 	},
-	createStrategy: function() {
-		this.controlParentName = "strategy";
-		this.inherited(arguments);
-		this.createChrome(this.listTools);
-		this.controlParentName = "client";
-		this.discoverControlParent();
-	},
+	createStrategy: enyo.inherit(function(sup) {
+		return function() {
+			this.controlParentName = "strategy";
+			sup.apply(this, arguments);
+			this.createChrome(this.listTools);
+			this.controlParentName = "client";
+			this.discoverControlParent();
+		};
+	}),
 	createSwipeableComponents: function() {
 		for (var i=0;i<this.swipeableComponents.length;i++) {
 			this.$.swipeableComponents.createComponent(this.swipeableComponents[i], {owner: this.owner});
 		}
 	},
-	rendered: function() {
-		this.inherited(arguments);
-		this.$.generator.node = this.$.port.hasNode();
-		this.$.generator.generated = true;
-		this.reset();
-	},
-	resizeHandler: function() {
-		this.inherited(arguments);
-		this.refresh();
-	},
+	rendered: enyo.inherit(function(sup) {
+		return function() {
+			sup.apply(this, arguments);
+			this.$.generator.node = this.$.port.hasNode();
+			this.$.generator.generated = true;
+			this.reset();
+		};
+	}),
+	handleResize: enyo.inherit(function(sup) {
+		return function() {
+			sup.apply(this, arguments);
+			this.refresh();
+		};
+	}),
 	bottomUpChanged: function() {
 		this.$.generator.bottomUp = this.bottomUp;
 		this.$.page0.applyStyle(this.pageBound, null);
 		this.$.page1.applyStyle(this.pageBound, null);
-		this.pageBound = this.orientV ? (this.bottomUp ? "bottom" : "top") : (this.bottomUp ? "right" : "left");
+
+		if (this.orientV) {
+			this.pageBound = this.bottomUp ? "bottom" : "top";
+		} else {
+			if (this.rtl) {
+				this.pageBound = this.bottomUp ? "left" : "right";
+			} else {
+				this.pageBound = this.bottomUp ? "right" : "left";
+			}
+		}
 
 		if (!this.orientV && this.bottomUp){
 			this.$.page0.applyStyle("left", "auto");
@@ -522,24 +551,28 @@ enyo.kind({
 		this.rowSize = 0;
 		this.updateMetrics();
 	},
-	scroll: function(inSender, inEvent) {
-		var r = this.inherited(arguments);
-		var pos = this.orientV ? this.getScrollTop() : this.getScrollLeft();
-		if (this.lastPos === pos) {
+	scroll: enyo.inherit(function(sup) {
+		return function(inSender, inEvent) {
+			var r = sup.apply(this, arguments);
+			var pos = this.orientV ? this.getScrollTop() : this.getScrollLeft();
+			if (this.lastPos === pos) {
+				return r;
+			}
+			this.lastPos = pos;
+			this.update(pos);
+			if (this.pinnedReorderMode) {
+				this.reorderScroll(inSender, inEvent);
+			}
 			return r;
-		}
-		this.lastPos = pos;
-		this.update(pos);
-		if (this.pinnedReorderMode) {
-			this.reorderScroll(inSender, inEvent);
-		}
-		return r;
-	},
-	setScrollTop: function(inScrollTop) {
-		this.update(inScrollTop);
-		this.inherited(arguments);
-		this.twiddle();
-	},
+		};
+	}),
+	setScrollTop: enyo.inherit(function(sup) {
+		return function(inScrollTop) {
+			this.update(inScrollTop);
+			sup.apply(this, arguments);
+			this.twiddle();
+		};
+	}),
 	getScrollPosition: function() {
 		return this.calcPos(this[(this.orientV ? "getScrollTop" : "getScrollLeft")]());
 	},
@@ -548,10 +581,12 @@ enyo.kind({
 	},
 	//* @public
 	//* Scrolls the list so the last item is visible.
-	scrollToBottom: function() {
-		this.update(this.getScrollBounds().maxTop);
-		this.inherited(arguments);
-	},
+	scrollToBottom: enyo.inherit(function(sup) {
+		return function() {
+			this.update(this.getScrollBounds().maxTop);
+			sup.apply(this, arguments);
+		};
+	}),
 	//* Scrolls to the specified row.
 	scrollToRow: function(inRow) {
 		var page = this.pageForRow(inRow);
@@ -615,9 +650,9 @@ enyo.kind({
 		Sets the selection state for the given row index.
 		_inData_ is an optional data value stored in the selection object.
 
-		Modifying selection will not automatically rerender the row,
-		so use [renderRow](#enyo.List::renderRow) or [refresh](#enyo.List::refresh)
-		to update the view.
+		Modifying selection will not automatically re-render the row, so use
+		[renderRow()](#enyo.List::renderRow) or [refresh()](#enyo.List::refresh) to
+		update the view.
 	*/
 	select: function(inIndex, inData) {
 		return this.getSelection().select(inIndex, inData);
@@ -625,9 +660,9 @@ enyo.kind({
 	/**
 		Clears the selection state for the given row index.
 
-		Modifying selection will not automatically re-render the row,
-		so use [renderRow](#enyo.List::renderRow) or [refresh](#enyo.List::refresh)
-		to update the view.
+		Modifying selection will not automatically re-render the row, so use
+		[renderRow()](#enyo.List::renderRow) or [refresh()](#enyo.List::refresh) to
+		update the view.
 	*/
 	deselect: function(inIndex) {
 		return this.getSelection().deselect(inIndex);
@@ -749,8 +784,9 @@ enyo.kind({
 	//* Centers the floating reorder container on the user's pointer.
 	centerReorderContainerOnPointer: function(e) {
 		var containerPosition = enyo.dom.calcNodePosition(this.hasNode());
-		var x = e.pageX - containerPosition.left - parseInt(this.$.reorderContainer.domStyles.width, 10)/2;
-		var y = e.pageY - containerPosition.top + this.getScrollTop() - parseInt(this.$.reorderContainer.domStyles.height, 10)/2;
+		var bounds = this.$.reorderContainer.getBounds();
+		var x = e.pageX - containerPosition.left - parseInt(bounds.width, 10)/2;
+		var y = e.pageY - containerPosition.top + this.getScrollTop() - parseInt(bounds.height, 10)/2;
 		if (this.getStrategyKind() != "ScrollStrategy") {
 			x -= this.getScrollLeft();
 			y -= this.getScrollTop();
@@ -1495,7 +1531,10 @@ enyo.kind({
 				this.doSwipeComplete({index: this.swipeIndex, xDirection: this.swipeDirection});
 			}
 		} else {
-			this.persistentItemVisible = true;
+			// persistent item will only be visible if the swipe was completed
+			if (this.swipeComplete) {
+				this.persistentItemVisible = true;
+			}
 		}
 		this.swipeIndex = null;
 		this.swipeDirection = null;
@@ -1503,7 +1542,7 @@ enyo.kind({
 	animateSwipe: function(targetX,totalTimeMS) {
 		var t0 = enyo.now();
 		var $item = this.$.swipeableComponents;
-		var origX = parseInt($item.domStyles.left,10);
+		var origX = parseInt($item.getBounds().left,10);
 		var xDelta = targetX - origX;
 
 		this.stopAnimateSwipe();

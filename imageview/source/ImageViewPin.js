@@ -23,7 +23,7 @@ enyo.kind({
 			* top: distance from the parent's top edge
 			* bottom: distance from the parent's bottom edge (overrides top)
 			* left: distance from the parent's left edge
-			* right: distance from the parennt's right edge (overrides left)
+			* right: distance from the parent's right edge (overrides left)
 		*/
 		anchor: {
 			top: 0,
@@ -50,13 +50,15 @@ enyo.kind({
 	handlers: {
 		onPositionPin: "reAnchor"
 	},
-	create: function() {
-		this.inherited(arguments);
-		this.styleClientControls();
-		this.positionClientControls();
-		this.highlightAnchorPointChanged();
-		this.anchorChanged();
-	},
+	create: enyo.inherit(function(sup) {
+		return function() {
+			sup.apply(this, arguments);
+			this.styleClientControls();
+			this.positionClientControls();
+			this.highlightAnchorPointChanged();
+			this.anchorChanged();
+		};
+	}),
 	// Absolutely position to client controls
 	styleClientControls: function() {
 		var controls = this.getClientControls();
